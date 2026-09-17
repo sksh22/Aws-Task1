@@ -39,9 +39,11 @@ except Exception as e:
 with open("template.yaml", "r") as file:
     template = file.read()
 
-# 5. Create CloudFormation stack
+# 5. Create or update CloudFormation stack
 try:
-    cloudformation.create_stack(
+    cloudformation.describe_stacks(StackName=STACK_NAME )
+    print("Stack already exists. Updating stack...")
+    cloudformation.update_stack(
         StackName=STACK_NAME,
         TemplateBody=template,
         Parameters=[
@@ -52,9 +54,31 @@ try:
             {
                 "ParameterKey": "LambdaCodeKey",
                 "ParameterValue": ZIP_FILE
-            }], 
-        Capabilities=["CAPABILITY_NAMED_IAM"])    
-    print("CloudFormation stack creation started.")   
+            }
+        ],
+        Capabilities=["CAPABILITY_NAMED_IAM"])
+    print("CloudFormation stack update started.")
+except cloudformation.exceptions.ValidationError as e:
+    if "does not exist" in str(e):
+        print("Stack does not exist. Creating stack...")
+        cloudformation.create_stack(
+            StackName=STACK_NAME,
+            TemplateBody=template,
+            Parameters=[
+                {
+                    "ParameterKey": "LambdaCodeBucket",
+                    "ParameterValue": DEPLOY_BUCKET
+                },
+                {
+                    "ParameterKey": "LambdaCodeKey",
+                    "ParameterValue": ZIP_FILE
+                }
+            ],
+            Capabilities=["CAPABILITY_NAMED_IAM"]   )
+        print("CloudFormation stack creation started.")
+    else:
+        print(f"CloudFormation error: {e}")
+        raise
 except Exception as e:
-    print(f"Error creating CloudFormation stack: {e}")
+    print(f"Error deploying CloudFormation stack: {e}")
     raise
