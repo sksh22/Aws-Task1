@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 to S3 file copy using lambda 
+
+Parameters:
+  LambdaCodeBucket:                                      
+    Type: String
+    Description: S3 bucket containing Lambda ZIP file
+  LambdaCodeKey:
+    Type: String
+    Description: S3 path of Lambda ZIP file
+
+Resources:
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    DependsOn:
+      - S3InvokePermission
+    Properties:
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt LambdaFunction.Arn
+
+  DestinationBucket:
+    Type: AWS::S3::Bucket
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:            
+        Version: '2012-10-17'                    
+        Statement:
+          - Effect: Allow               
+            Principal:                          
+              Service:
+                - lambda.amazonaws.com              
+            Action:
+              - sts:AssumeRole     
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole    
+
+  S3AccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: S3AccessPolicy
+      Roles:
+        - !Ref LambdaExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${SourceBucket}/*'
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${DestinationBucket}/*'
+          - Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:s3:::${DestinationBucket}/*'    
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler     
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 900   
+      Environment:                                             
+        Variables:
+          DESTINATION_BUCKET: !Ref DestinationBucket                              
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeKey
+
+  S3InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunction
+      Principal: s3.amazonaws.com           
+      SourceAccount: !Ref AWS::AccountId
+
+Outputs:
+  SourceBucket:
+    Description: Source S3 bucket name
+    Value: !Ref SourceBucket
+  DestinationBucket:
+    Description: Destination S3 bucket name
+    Value: !Ref DestinationBucket
+  LambdaFunction:
+    Description: Lambda function name
+    Value: !Ref LambdaFunction
