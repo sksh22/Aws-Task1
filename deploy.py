@@ -5,7 +5,7 @@ REGION = "eu-north-1"
 s3 = boto3.client("s3", region_name=REGION)                   #resource & session
 cloudformation = boto3.client("cloudformation", region_name=REGION)
 
-STACK_NAME = "s3-lambda-stack-02"
+STACK_NAME = "s3-lambda-stack-03"
 DEPLOY_BUCKET = "sksh-deploymentbucket-2026"
 ZIP_FILE = "lambda_function.zip"
 
