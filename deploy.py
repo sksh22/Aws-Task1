@@ -1,5 +1,6 @@
 import boto3
 import zipfile  
+from botocore.exceptions import ClientError
 
 REGION = "eu-north-1"
 s3 = boto3.client("s3", region_name=REGION)                   #resource & session
@@ -41,7 +42,7 @@ with open("template.yaml", "r") as file:
 
 # 5. Create or update CloudFormation stack
 try:
-    cloudformation.describe_stacks(StackName=STACK_NAME )
+    cloudformation.describe_stacks(StackName=STACK_NAME)
     print("Stack already exists. Updating stack...")
     cloudformation.update_stack(
         StackName=STACK_NAME,
@@ -58,8 +59,9 @@ try:
         ],
         Capabilities=["CAPABILITY_NAMED_IAM"])
     print("CloudFormation stack update started.")
-except cloudformation.exceptions.ValidationError as e:
-    if "does not exist" in str(e):
+except ClientError as e:
+    error_code = e.response["Error"]["Code"]
+    if error_code == "ValidationError" and "does not exist" in str(e):
         print("Stack does not exist. Creating stack...")
         cloudformation.create_stack(
             StackName=STACK_NAME,
@@ -74,7 +76,7 @@ except cloudformation.exceptions.ValidationError as e:
                     "ParameterValue": ZIP_FILE
                 }
             ],
-            Capabilities=["CAPABILITY_NAMED_IAM"]   )
+            Capabilities=["CAPABILITY_NAMED_IAM"])
         print("CloudFormation stack creation started.")
     else:
         print(f"CloudFormation error: {e}")
